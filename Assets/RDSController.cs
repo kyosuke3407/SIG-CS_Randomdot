@@ -27,13 +27,13 @@ public class RDSController : MonoBehaviour
     // =========================================================
 
     [Header("Display Profile")]
-    [Tooltip("0: displayProfiles[0], 1: displayProfiles[1]")]
+    [Tooltip("0: curved display, 1: flat display")]
     public int displayNum = 0;
+
     public int displayL = 1;
     public int displayR = 2;
 
     public DisplayProfile[] displayProfiles;
-
 
     private float worldUnitToMm = 1.0f;
 
@@ -42,11 +42,8 @@ public class RDSController : MonoBehaviour
     // =========================================================
 
     [Header("Viewer Position [world]")]
-
     public float viewerXWorld = 0.0f;
-
     public float viewerYWorld = 0.0f;
-
     public float viewerZWorld = 1000.0f;
 
     [Header("IPD")]
@@ -57,7 +54,6 @@ public class RDSController : MonoBehaviour
     // =========================================================
 
     [Header("Target Disparity Angle [deg]")]
- 
     public float targetAngleDeg = 0.5f;
 
     // =========================================================
@@ -65,7 +61,6 @@ public class RDSController : MonoBehaviour
     // =========================================================
 
     [Header("Circle Stimulus [world]")]
-
     public float circleCenterXWorld = 0.0f;
 
     [Tooltip("ディスプレイ中心基準．上が+")]
@@ -110,9 +105,9 @@ public class RDSController : MonoBehaviour
 
     [Header("Result")]
     [SerializeField] private int bestDisparityPx;
-    [SerializeField] private float halfDisparityPx;
-    [SerializeField] private float actualAngleDeg;
-    [SerializeField] private float errorDeg;
+    private float halfDisparityPx;
+    private float actualAngleDeg;
+    private float errorDeg;
 
     [SerializeField] private float leftShiftPx;
     [SerializeField] private float rightShiftPx;
@@ -121,17 +116,23 @@ public class RDSController : MonoBehaviour
     [SerializeField] private float circleCenterYPx;
     [SerializeField] private float circleRadiusPx;
 
-    [SerializeField] private float viewerXmm;
-    [SerializeField] private float viewerYmm;
-    [SerializeField] private float viewerZmm;
+    private float viewerXmm;
+    private float viewerYmm;
+    private float viewerZmm;
 
-    [SerializeField] private float circleCenterXmm;
-    [SerializeField] private float circleCenterYmm;
-    [SerializeField] private float circleRadiusMm;
+    private float circleCenterXmm;
+    private float circleCenterYmm;
+    private float circleRadiusMm;
 
-    [SerializeField] private int activeWidthPx;
-    [SerializeField] private int activeHeightPx;
-    [SerializeField] private float activePp;
+    private int activeWidthPx;
+    private int activeHeightPx;
+    private float activePp;
+
+
+    private float fixationZmm;
+    private float viewerToFixationMm;
+    private float leftEyeToFixationMm;
+    private float rightEyeToFixationMm;
 
     private Renderer activeLeftQuadRenderer;
     private Renderer activeRightQuadRenderer;
@@ -399,6 +400,52 @@ public class RDSController : MonoBehaviour
     }
 
     // =========================================================
+    // Display surface geometry
+    // =========================================================
+
+    Vector3 GetDisplayPointMm(float xMm, float yMm)
+    {
+        // displayNum = 1:
+        // 平面ディスプレイ．表示面は z = 0 とする．
+        // 円中心が横に動くと，視聴者から円中心までの距離は自然に長くなる．
+        if (displayNum == 1)
+        {
+            return new Vector3(xMm, yMm, 0.0f);
+        }
+
+        // displayNum = 0:
+        // 曲面ディスプレイ．
+        // 水平方向について，視聴者から表示点までの距離が一定になるようにzを補正する．
+        //
+        // 視聴者位置: (viewerXmm, viewerYmm, viewerZmm)
+        // ディスプレイ中心: (0, 0, 0)
+        //
+        // x-z平面で，
+        // (x - viewerX)^2 + (z - viewerZ)^2 = R^2
+        // R = ディスプレイ中心までの距離
+        //
+        // 中心 x=0 のとき z=0 になる方の解を使う．
+
+        float radiusXZ = Mathf.Sqrt(
+            viewerXmm * viewerXmm +
+            viewerZmm * viewerZmm
+        );
+
+        float dx = xMm - viewerXmm;
+
+        float inside = radiusXZ * radiusXZ - dx * dx;
+
+        if (inside < 0.0f)
+        {
+            inside = 0.0f;
+        }
+
+        float zMm = viewerZmm - Mathf.Sqrt(inside);
+
+        return new Vector3(xMm, yMm, zMm);
+    }
+
+    // =========================================================
     // Disparity angle calculation
     // =========================================================
 
@@ -406,9 +453,14 @@ public class RDSController : MonoBehaviour
     {
         float shiftMm = dispPx * activePp;
 
+        // 融合後の見かけ中心 = 円中心
         float mx = circleCenterXmm;
         float my = circleCenterYmm;
 
+        // 左右画像上の対応点
+        // 正のdisp:
+        //   left  = +disp/2
+        //   right = -disp/2
         float lx = mx + shiftMm / 2.0f;
         float rx = mx - shiftMm / 2.0f;
 
@@ -424,9 +476,11 @@ public class RDSController : MonoBehaviour
             viewerZmm
         );
 
-        Vector3 leftPoint = new Vector3(lx, my, 0.0f);
-        Vector3 rightPoint = new Vector3(rx, my, 0.0f);
-        Vector3 midPoint = new Vector3(mx, my, 0.0f);
+        // ここで displayNum に応じて，
+        // 曲面なら z を補正，平面なら z=0 として扱う．
+        Vector3 leftPoint = GetDisplayPointMm(lx, my);
+        Vector3 rightPoint = GetDisplayPointMm(rx, my);
+        Vector3 midPoint = GetDisplayPointMm(mx, my);
 
         Vector3 l1 = leftPoint - leftEye;
         Vector3 r1 = rightPoint - rightEye;
@@ -437,7 +491,23 @@ public class RDSController : MonoBehaviour
         float alpha = Vector3.Angle(l1, r1);
         float beta = Vector3.Angle(l2, r2);
 
+        UpdateGeometryDebug(leftEye, rightEye, midPoint);
+
         return alpha - beta;
+    }
+
+    void UpdateGeometryDebug(Vector3 leftEye, Vector3 rightEye, Vector3 fixationPoint)
+    {
+        Vector3 viewerCenter = new Vector3(
+            viewerXmm,
+            viewerYmm,
+            viewerZmm
+        );
+
+        fixationZmm = fixationPoint.z;
+        viewerToFixationMm = Vector3.Distance(viewerCenter, fixationPoint);
+        leftEyeToFixationMm = Vector3.Distance(leftEye, fixationPoint);
+        rightEyeToFixationMm = Vector3.Distance(rightEye, fixationPoint);
     }
 
     // =========================================================
@@ -532,6 +602,4 @@ public class RDSController : MonoBehaviour
     {
         UpdateRDS();
     }
-
-
 }

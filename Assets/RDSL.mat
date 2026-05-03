@@ -39,7 +39,7 @@ Material:
     m_TexEnvs: []
     m_Ints: []
     m_Floats:
-    - _EyeSign: 1
+    - _EyeSign: -1
     m_Colors: []
   m_BuildTextureStacks: []
   m_AllowLocking: 1
