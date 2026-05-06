@@ -67,6 +67,9 @@
             float _CropHalfWidthMm;
             float _CropHalfHeightMm;
 
+            float _VirtualOffsetXPx;
+            float _VirtualOffsetYPx;
+
             struct Attributes
             {
                 float4 positionOS : POSITION;
@@ -131,7 +134,7 @@
                 float pp = max(_Pp, 0.000001);
 
                 // =================================================
-                // UV -> pixel座標
+                // UV -> 実画面pixel座標
                 // pixel.x: 左から右
                 // pixel.y: 上から下
                 // =================================================
@@ -140,17 +143,27 @@
                 pixel.y = (1.0 - input.uv.y) * heightPx;
 
                 // =================================================
+                // 仮想曲面ディスプレイ座標
+                //
+                // displayNum=1の平面条件では，
+                // C#側から _VirtualOffsetXPx / _VirtualOffsetYPx が入る．
+                //
+                // 実画面上では仮想ディスプレイ全体がoffset方向へ動く．
+                // そのため，描画内容の生成には offset を引いた座標を使う．
+                // =================================================
+                float2 virtualPixel = pixel - float2(_VirtualOffsetXPx, _VirtualOffsetYPx);
+
+                // =================================================
                 // 物理サイズベースのクロップ
-                // displayNum = 1 のときだけC#側で有効化される
                 //
                 // 描画内容は縮小せず，
-                // 現在の平面ディスプレイ上のmm座標が，
-                // 曲面ディスプレイ実寸の範囲外なら黒にする
+                // 仮想曲面ディスプレイ座標上のmm座標が，
+                // 曲面ディスプレイ実寸の範囲外なら黒にする．
                 // =================================================
                 if (_CropEnabled > 0.5)
                 {
-                    float xMm = (pixel.x - widthPx * 0.5) * pp;
-                    float yMm = (heightPx * 0.5 - pixel.y) * pp;
+                    float xMm = (virtualPixel.x - widthPx * 0.5) * pp;
+                    float yMm = (heightPx * 0.5 - virtualPixel.y) * pp;
 
                     bool outside =
                         (abs(xMm) > _CropHalfWidthMm) ||
@@ -169,7 +182,7 @@
                 // =================================================
                 // 背景ドット
                 // =================================================
-                uint2 bgCell = (uint2)floor(pixel / dotSizePx);
+                uint2 bgCell = (uint2)floor(virtualPixel / dotSizePx);
                 float bg = RandomDot(
                     bgCell,
                     SeedToUint(_BackgroundSeed),
@@ -191,7 +204,7 @@
                 // =================================================
                 // 円マスク
                 // =================================================
-                float2 diff = pixel - shiftedCenter;
+                float2 diff = virtualPixel - shiftedCenter;
                 float dist2 = dot(diff, diff);
 
                 float insideCircle = step(dist2, _CircleRadiusPx * _CircleRadiusPx);
@@ -201,7 +214,7 @@
                 // 円内部は「シフト前の座標」で乱数を生成する
                 // これにより，左右で同じ円内部パターンが対応する
                 // =================================================
-                float2 sourcePixel = pixel - float2(shiftPx, 0.0);
+                float2 sourcePixel = virtualPixel - float2(shiftPx, 0.0);
                 uint2 objCell = (uint2)floor(sourcePixel / dotSizePx);
 
                 float obj = RandomDot(

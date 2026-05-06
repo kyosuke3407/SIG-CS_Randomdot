@@ -80,14 +80,25 @@ public class RDSController : MonoBehaviour
     public float circleRadiusWorld = 30.0f;
 
     // =========================================================
+    // Flat virtual display offset
+    // =========================================================
+
+    [Header("Flat Virtual Display Offset [world]")]
+    [Tooltip("displayNum=1 の平面条件で，仮想曲面ディスプレイ全体を右方向へ動かす量")]
+    public float flatVirtualOffsetXWorld = 0.0f;
+
+    [Tooltip("displayNum=1 の平面条件で，仮想曲面ディスプレイ全体を上方向へ動かす量")]
+    public float flatVirtualOffsetYWorld = 0.0f;
+
+    // =========================================================
     // Disparity search
     // =========================================================
 
     [Header("Disparity Search Range [px]")]
-    public int positiveDispMinPx = 1;
-    public int positiveDispMaxPx = 200;
-    public int negativeDispMinPx = -200;
-    public int negativeDispMaxPx = -1;
+    private int positiveDispMinPx = 1;
+    private int positiveDispMaxPx = 400;
+    private int negativeDispMinPx = -400;
+    private int negativeDispMaxPx = -1;
 
     // =========================================================
     // Random dot
@@ -150,6 +161,12 @@ public class RDSController : MonoBehaviour
     [SerializeField] private float cropHalfHeightMm;
     [SerializeField] private float curvedPhysicalWidthMm;
     [SerializeField] private float curvedPhysicalHeightMm;
+
+    [Header("Flat Virtual Offset Debug")]
+    [SerializeField] private float flatVirtualOffsetXmm;
+    [SerializeField] private float flatVirtualOffsetYmm;
+    [SerializeField] private float flatVirtualOffsetXPx;
+    [SerializeField] private float flatVirtualOffsetYPx;
 
     private Renderer activeLeftQuadRenderer;
     private Renderer activeRightQuadRenderer;
@@ -230,21 +247,11 @@ public class RDSController : MonoBehaviour
     {
         ValidateParameters();
 
-        if (displayProfiles == null || displayProfiles.Length == 0)
-        {
-            Debug.LogError("Display Profiles が設定されていません。");
-            return;
-        }
-
         displayNum = Mathf.Clamp(displayNum, 0, displayProfiles.Length - 1);
 
         DisplayProfile profile = displayProfiles[displayNum];
 
-        if (profile == null)
-        {
-            Debug.LogError($"DisplayProfile {displayNum} が null です。");
-            return;
-        }
+
 
         activeWidthPx = Mathf.Max(1, profile.widthPx);
         activeHeightPx = Mathf.Max(1, profile.heightPx);
@@ -306,38 +313,9 @@ public class RDSController : MonoBehaviour
 
     void InitializeMaterials()
     {
-        if (activeLeftQuadRenderer == null || activeRightQuadRenderer == null)
-        {
-            Debug.LogError("Profile内の LeftQuadRenderer または RightQuadRenderer が未設定です。");
-            return;
-        }
-
         leftMat = activeLeftQuadRenderer.material;
         rightMat = activeRightQuadRenderer.material;
 
-        if (activeLeftQuadRenderer.sharedMaterial == activeRightQuadRenderer.sharedMaterial)
-        {
-            Debug.LogWarning(
-                "LeftQuad と RightQuad が同じMaterialアセットを参照しています。" +
-                "RDS_L.mat と RDS_R.mat を別々に用意して割り当ててください。"
-            );
-        }
-
-        if (leftMat == null || rightMat == null)
-        {
-            Debug.LogError("左右いずれかのMaterialがnullです。");
-            return;
-        }
-
-        if (leftMat.shader == null || leftMat.shader.name != "Unlit/RDS")
-        {
-            Debug.LogWarning($"Left material shader is {leftMat.shader?.name}. Unlit/RDS を指定してください。");
-        }
-
-        if (rightMat.shader == null || rightMat.shader.name != "Unlit/RDS")
-        {
-            Debug.LogWarning($"Right material shader is {rightMat.shader?.name}. Unlit/RDS を指定してください。");
-        }
     }
 
     // =========================================================
@@ -396,6 +374,20 @@ public class RDSController : MonoBehaviour
         circleCenterXPx = (activeWidthPx / 2.0f) + (circleCenterXmm / activePp);
         circleCenterYPx = (activeHeightPx / 2.0f) - (circleCenterYmm / activePp);
         circleRadiusPx = circleRadiusMm / activePp;
+
+        if (displayNum == 1)
+        {
+            flatVirtualOffsetXmm = flatVirtualOffsetXWorld * worldUnitToMm;
+            flatVirtualOffsetYmm = flatVirtualOffsetYWorld * worldUnitToMm;
+        }
+        else
+        {
+            flatVirtualOffsetXmm = 0.0f;
+            flatVirtualOffsetYmm = 0.0f;
+        }
+
+        flatVirtualOffsetXPx = flatVirtualOffsetXmm / activePp;
+        flatVirtualOffsetYPx = -flatVirtualOffsetYmm / activePp;
     }
 
     // =========================================================
@@ -462,6 +454,9 @@ public class RDSController : MonoBehaviour
         mat.SetFloat("_CropEnabled", cropEnabled ? 1.0f : 0.0f);
         mat.SetFloat("_CropHalfWidthMm", cropHalfWidthMm);
         mat.SetFloat("_CropHalfHeightMm", cropHalfHeightMm);
+
+        mat.SetFloat("_VirtualOffsetXPx", flatVirtualOffsetXPx);
+        mat.SetFloat("_VirtualOffsetYPx", flatVirtualOffsetYPx);
     }
 
     // =========================================================
@@ -476,18 +471,6 @@ public class RDSController : MonoBehaviour
         {
             return new Vector3(xMm, yMm, 0.0f);
         }
-
-        // displayNum = 0:
-        // 1000R曲面ディスプレイ．
-        // 水平方向だけ曲率を持つ円柱面として扱う．
-        //
-        // ディスプレイ中心 = (0, 0, 0)
-        // 視聴者側 = +z
-        // 曲率中心 = (0, 0, Curvature)
-        //
-        // x^2 + (z - Curvature)^2 = Curvature^2
-        //
-        // z = Curvature - sqrt(Curvature^2 - x^2)
 
         float inside = Curvature * Curvature - xMm * xMm;
 
@@ -509,8 +492,8 @@ public class RDSController : MonoBehaviour
     {
         float shiftMm = dispPx * activePp;
 
-        float mx = circleCenterXmm;
-        float my = circleCenterYmm;
+        float mx = circleCenterXmm + flatVirtualOffsetXmm;
+        float my = circleCenterYmm + flatVirtualOffsetYmm;
 
         float lx = mx + shiftMm / 2.0f;
         float rx = mx - shiftMm / 2.0f;
@@ -582,12 +565,6 @@ public class RDSController : MonoBehaviour
         {
             start = negativeDispMinPx;
             end = negativeDispMaxPx;
-        }
-
-        if (start > end)
-        {
-            Debug.LogError("視差探索範囲が不正です。min <= max になるように設定してください。");
-            return 0;
         }
 
         int bestDisp = start;
