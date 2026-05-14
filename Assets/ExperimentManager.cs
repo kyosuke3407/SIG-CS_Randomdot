@@ -8,6 +8,9 @@ using TMPro;
 
 public class ExperimentManager : MonoBehaviour
 {
+    [Header("Experiment Mode")]
+    public bool isExperimentMode = true;
+
     [Header("Experiment Settings")]
     public float radius = 30f;
     public float pixelDegree = 0.0133f;
@@ -15,7 +18,7 @@ public class ExperimentManager : MonoBehaviour
     public float initialStepArcmin = 6.38f;
     public float minStepArcmin = 0.798f;
     public int maxReversals = 10;
-    
+
     [Header("Durations")]
     public float preTrialDuration = 0.5f;
     public float referenceDuration = 1.0f;
@@ -138,24 +141,16 @@ public class ExperimentManager : MonoBehaviour
         LogMessage($"Pixel = {pixelArcmin:F3} arcmin");
         LogMessage($"Init Disp: {initialDisparityPx}px, Init Step: {initialStepPx}px, Min Step: {minStepPx}px");
 
-        // 初期状態で真っ暗にする
-        if (rdsController != null)
-        {
-            rdsController.fadeLevel = 0f;
-            rdsController.debugSolidCircle = this.debugSolidCircle;
-            rdsController.UpdateRDSNow();
-        }
-
         // Initialize CSV file
         string timestamp = DateTime.Now.ToString("yyyyMMdd_HHmmss");
         string projectRoot = Directory.GetParent(Application.dataPath).FullName;
         string expFolderPath = Path.Combine(projectRoot, "EXP");
-        
+
         if (!Directory.Exists(expFolderPath))
         {
             Directory.CreateDirectory(expFolderPath);
         }
-        
+
         csvFilePath = Path.Combine(expFolderPath, $"ExperimentResult_{timestamp}.csv");
         File.AppendAllText(csvFilePath, "TrialID,Condition,Series,DisparityArcmin,IsCorrect,IsReversal,CurrentStepArcmin\n");
 
@@ -165,7 +160,33 @@ public class ExperimentManager : MonoBehaviour
 
         if (restartButton != null) restartButton.gameObject.SetActive(false);
 
-        StartCoroutine(ExperimentLoop());
+        // --- 初期モードに応じたUIと処理の振り分け ---
+        if (!isExperimentMode)
+        {
+            // 実験モードOFF時はUIを隠す
+            if (startButton != null) startButton.gameObject.SetActive(false);
+            if (quitButton != null) quitButton.gameObject.SetActive(false);
+            if (logText != null) logText.gameObject.SetActive(false);
+
+            // 強制的に表示状態（真っ暗・グレーを解除）にする
+            if (rdsController != null)
+            {
+                rdsController.fadeLevel = 1f;
+                rdsController.isResting = false;
+                rdsController.UpdateRDSNow();
+            }
+        }
+        else
+        {
+            // 実験モードON時
+            if (rdsController != null)
+            {
+                rdsController.fadeLevel = 0f;
+                rdsController.debugSolidCircle = this.debugSolidCircle;
+                rdsController.UpdateRDSNow();
+            }
+            StartCoroutine(ExperimentLoop());
+        }
     }
 
     public void QuitExperiment()
@@ -182,6 +203,11 @@ public class ExperimentManager : MonoBehaviour
         // Wait for start
         while (!isStartPressed)
         {
+            var gamepad = UnityEngine.InputSystem.Gamepad.current;
+            if (gamepad != null && gamepad.buttonEast.wasPressedThisFrame)
+            {
+                isStartPressed = true;
+            }
             yield return null;
         }
         if (startButton != null) startButton.gameObject.SetActive(false);
@@ -225,27 +251,57 @@ public class ExperimentManager : MonoBehaviour
 
     void Update()
     {
+        // デバッグ円のインスペクターでの変更検知は常に実行する
         if (rdsController != null && rdsController.debugSolidCircle != this.debugSolidCircle)
         {
             rdsController.debugSolidCircle = this.debugSolidCircle;
             rdsController.UpdateRDSNow();
         }
 
+        // 実験モードOFFなら、以下の実験用キー入力は無視する
+        if (!isExperimentMode) return;
+
         if (isWaitingForResponse)
         {
+            bool responded = false;
+
+            // キーボード入力
             var keyboard = UnityEngine.InputSystem.Keyboard.current;
             if (keyboard != null)
             {
                 if (keyboard.upArrowKey.wasPressedThisFrame)
                 {
                     userResponseIsCross = false; // 奥
-                    isWaitingForResponse = false;
+                    responded = true;
                 }
                 else if (keyboard.downArrowKey.wasPressedThisFrame)
                 {
                     userResponseIsCross = true; // 手前
-                    isWaitingForResponse = false;
+                    responded = true;
                 }
+            }
+
+            // ゲームパッド入力
+            var gamepad = UnityEngine.InputSystem.Gamepad.current;
+            if (gamepad != null && !responded)
+            {
+                // D-padの上、または上ボタン（Y / △）
+                if (gamepad.dpad.up.wasPressedThisFrame || gamepad.buttonNorth.wasPressedThisFrame)
+                {
+                    userResponseIsCross = false; // 奥
+                    responded = true;
+                }
+                // D-padの下、または下ボタン（A / ✕）
+                else if (gamepad.dpad.down.wasPressedThisFrame || gamepad.buttonSouth.wasPressedThisFrame)
+                {
+                    userResponseIsCross = true; // 手前
+                    responded = true;
+                }
+            }
+
+            if (responded)
+            {
+                isWaitingForResponse = false;
             }
         }
     }
@@ -277,7 +333,7 @@ public class ExperimentManager : MonoBehaviour
             if (!uncrossedSeries.isFinished) activeSeries.Add(uncrossedSeries);
 
             StaircaseSeries currentSeries = activeSeries[UnityEngine.Random.Range(0, activeSeries.Count)];
-            
+
             trialCount++;
             yield return StartCoroutine(RunTrial(currentSeries));
 
@@ -303,6 +359,11 @@ public class ExperimentManager : MonoBehaviour
             currentDisparityDeg = -currentDisparityDeg; // 奥の場合は負の値と仮定
         }
 
+        // デバッグ用に現在の正解方向を画面に表示
+        string seriesName = series.isCross ? "Cross (手前)" : "Uncross (奥)";
+        LogMessage($"--- Trial {trialCount} [{currentConditionName}] ---");
+        LogMessage($"[Target] {seriesName} | Disp: {Mathf.Abs(currentDisparityArcmin):F2} arcmin");
+
         // 0. Pre-Trial State (真っ暗なまま待機)
         yield return new WaitForSeconds(preTrialDuration);
 
@@ -327,7 +388,7 @@ public class ExperimentManager : MonoBehaviour
         yield return StartCoroutine(FadeOut());
         HideRDS();
         // ★応答待ちの間も真っ暗なままにする
-        
+
         isWaitingForResponse = true;
         while (isWaitingForResponse)
         {
@@ -340,22 +401,18 @@ public class ExperimentManager : MonoBehaviour
 
         // ログ出力
         float currentStepArcmin = series.currentStepPx * pixelArcmin;
-        string seriesName = series.isCross ? "Cross" : "Uncross";
-        string logLine = $"{trialCount},{currentConditionName},{seriesName},{currentDisparityArcmin},{isCorrect},{isReversal},{currentStepArcmin}\n";
+        string logLine = $"{trialCount},{currentConditionName},{(series.isCross ? "Cross" : "Uncross")},{currentDisparityArcmin},{isCorrect},{isReversal},{currentStepArcmin}\n";
         File.AppendAllText(csvFilePath, logLine);
-        
+
         string userAnsStr = userResponseIsCross ? "Cross" : "Uncross";
         string correctStr = isCorrect ? "Correct" : "Incorrect";
-        string trialLog = "--------------------------------\n" +
-                          $"Trial {trialCount} [{currentConditionName} - {seriesName}]\n" +
-                          $"Disp: {currentDisparityArcmin:F2} arcmin, Step: {currentStepArcmin:F2} arcmin\n" +
-                          $"Answer: {userAnsStr} ({correctStr})";
-                          
+
+        string trialLog = $"[Result] Answer: {userAnsStr} -> {correctStr}";
         if (isReversal)
         {
-            trialLog += $"\n*** REVERSAL! (Count: {series.reversalCount} / {maxReversals}) ***";
+            trialLog += $" *** REVERSAL! ({series.reversalCount}/{maxReversals}) ***";
         }
-        
+
         LogMessage(trialLog);
     }
 
@@ -399,6 +456,11 @@ public class ExperimentManager : MonoBehaviour
             rdsController.circleCenterYWorld = location.y;
             rdsController.circleRadiusWorld = radius;
             rdsController.targetAngleDeg = disparityDegree;
+
+            // ランダムドットのパターンを毎回変えるためにシード値を更新
+            rdsController.backgroundSeed = UnityEngine.Random.Range(1f, 10000f);
+            rdsController.objectSeed = UnityEngine.Random.Range(1f, 10000f);
+
             // 視差0のときは表示するがターゲット視差を0にする
             rdsController.UpdateRDSNow();
         }
@@ -423,7 +485,7 @@ public class ExperimentManager : MonoBehaviour
     }
 
     private Queue<string> logQueue = new Queue<string>();
-    private int maxLogLines = 3;
+    private int maxLogLines = 8; // ログを見やすくするため行数を増やしました
 
     private void LogMessage(string msg)
     {
@@ -436,6 +498,74 @@ public class ExperimentManager : MonoBehaviour
                 logQueue.Dequeue();
             }
             logText.text = string.Join("\n", logQueue);
+        }
+    }
+
+    // --- 追加：ボタンから呼び出すためのトグル用メソッド ---
+
+    public void ToggleExperimentMode()
+    {
+        isExperimentMode = !isExperimentMode;
+
+        if (!isExperimentMode)
+        {
+            // 実験モードをOFFにする
+            StopAllCoroutines();
+
+            if (startButton != null) startButton.gameObject.SetActive(false);
+            if (restartButton != null) restartButton.gameObject.SetActive(false);
+            if (quitButton != null) quitButton.gameObject.SetActive(false);
+            if (logText != null) logText.gameObject.SetActive(false);
+
+            // 強制的に表示状態（真っ暗・グレーを解除）にする
+            if (rdsController != null)
+            {
+                rdsController.fadeLevel = 1f;
+                rdsController.isResting = false;
+                rdsController.UpdateRDSNow();
+            }
+        }
+        else
+        {
+            // 実験モードをONにして、最初からやり直す
+            if (startButton != null) startButton.gameObject.SetActive(true);
+            if (restartButton != null) restartButton.gameObject.SetActive(false);
+            if (quitButton != null) quitButton.gameObject.SetActive(true);
+            if (logText != null)
+            {
+                logText.gameObject.SetActive(true);
+                logText.text = "";
+                logQueue.Clear();
+            }
+
+            isStartPressed = false;
+            isRestartPressed = false;
+            trialCount = 0;
+
+            if (rdsController != null)
+            {
+                rdsController.fadeLevel = 0f;
+                rdsController.isResting = false;
+                rdsController.UpdateRDSNow();
+            }
+
+            // パラメータを最新のインスペクター値で再計算
+            pixelArcmin = pixelDegree * 60f;
+            initialDisparityPx = Mathf.RoundToInt(initialDisparityArcmin / pixelArcmin);
+            initialStepPx = Mathf.RoundToInt(initialStepArcmin / pixelArcmin);
+            minStepPx = Mathf.RoundToInt(minStepArcmin / pixelArcmin);
+
+            StartCoroutine(ExperimentLoop());
+        }
+    }
+
+    public void ToggleDebugSolidCircle()
+    {
+        debugSolidCircle = !debugSolidCircle;
+        if (rdsController != null)
+        {
+            rdsController.debugSolidCircle = this.debugSolidCircle;
+            rdsController.UpdateRDSNow();
         }
     }
 }

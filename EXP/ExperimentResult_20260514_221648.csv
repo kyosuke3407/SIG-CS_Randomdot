@@ -1,0 +1,16 @@
+TrialID,Condition,Series,DisparityArcmin,IsCorrect,IsReversal,CurrentStepArcmin
+1,Peripheral,Uncross,-30.324,True,False,6.384
+2,Peripheral,Uncross,-30.324,True,False,6.384
+3,Peripheral,Cross,30.324,False,False,6.384
+4,Peripheral,Cross,36.708,True,False,6.384
+5,Peripheral,Cross,36.708,True,True,3.192
+6,Peripheral,Cross,33.516,True,False,3.192
+7,Peripheral,Uncross,-23.94,True,False,6.384
+8,Peripheral,Uncross,-23.94,True,False,6.384
+9,Peripheral,Cross,33.516,True,False,3.192
+10,Peripheral,Cross,30.324,True,False,3.192
+11,Peripheral,Uncross,-17.556,True,False,6.384
+12,Peripheral,Uncross,-17.556,True,False,6.384
+13,Peripheral,Cross,30.324,True,False,3.192
+14,Peripheral,Cross,27.132,True,False,3.192
+15,Peripheral,Cross,27.132,True,False,3.192

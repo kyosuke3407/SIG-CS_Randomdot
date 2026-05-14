@@ -1,0 +1,17 @@
+TrialID,Condition,Series,DisparityArcmin,IsCorrect,IsReversal,CurrentStepArcmin
+1,Center,Uncross,-59.85,False,False,6.384
+2,Center,Uncross,-66.234,False,False,6.384
+3,Center,Cross,59.85,True,False,6.384
+4,Center,Uncross,-72.618,False,False,6.384
+5,Center,Cross,59.85,False,False,6.384
+6,Center,Uncross,-79.002,True,False,6.384
+7,Center,Uncross,-79.002,True,True,3.192
+8,Center,Cross,66.234,True,False,6.384
+9,Center,Uncross,-75.81,True,False,3.192
+10,Center,Uncross,-75.81,False,True,1.596
+11,Center,Uncross,-77.406,False,False,1.596
+12,Center,Cross,66.234,False,False,6.384
+13,Center,Uncross,-79.002,True,False,1.596
+14,Center,Cross,72.618,True,False,6.384
+15,Center,Uncross,-79.002,False,False,1.596
+16,Center,Uncross,-80.598,False,False,1.596
