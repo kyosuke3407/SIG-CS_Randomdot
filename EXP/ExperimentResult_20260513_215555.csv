@@ -1,0 +1,2 @@
+TrialID,Condition,Series,DisparityArcmin,IsCorrect,IsReversal,CurrentStepArcmin
+1,Center,Cross,12.768,True,False,6.384

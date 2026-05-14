@@ -1,4 +1,4 @@
-﻿Shader "Unlit/RDS"
+Shader "Unlit/RDS"
 {
     Properties
     {
@@ -69,6 +69,10 @@
 
             float _VirtualOffsetXPx;
             float _VirtualOffsetYPx;
+            float _FadeLevel;
+            float _DebugSolidCircle;
+            float _IsResting;
+            float4 _RestColor;
 
             struct Attributes
             {
@@ -175,6 +179,11 @@
                     }
                 }
 
+                if (_IsResting > 0.5)
+                {
+                    return half4(_RestColor.r, _RestColor.g, _RestColor.b, 1.0);
+                }
+
                 // 1 px単位のランダムドット
                 // モアレが残る場合は 2.0 などに変更
                 float dotSizePx = 1.0;
@@ -223,7 +232,17 @@
                     _PWhite
                 );
 
-                float value = lerp(bg, obj, insideCircle);
+                float value;
+                if (_DebugSolidCircle > 0.5)
+                {
+                    // デバッグ用のベタ塗り円（円内部は白、外部は黒）
+                    value = insideCircle;
+                }
+                else
+                {
+                    float valueDot = lerp(bg, obj, insideCircle);
+                    value = valueDot;
+                }
 
                 // =================================================
                 // デバッグ用：円の輪郭
@@ -235,7 +254,7 @@
                     value = lerp(value, 1.0, edge * 0.7);
                 }
 
-                return half4(value, value, value, 1.0);
+                return half4(value * _FadeLevel, value * _FadeLevel, value * _FadeLevel, 1.0);
             }
 
             ENDHLSL

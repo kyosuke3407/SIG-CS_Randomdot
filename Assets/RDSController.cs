@@ -1,4 +1,4 @@
-﻿using UnityEngine;
+using UnityEngine;
 
 [System.Serializable]
 public class DisplayProfile
@@ -115,8 +115,17 @@ public class RDSController : MonoBehaviour
     // Debug / Update
     // =========================================================
 
+    [Header("Fade")]
+    [Range(0.0f, 1.0f)]
+    public float fadeLevel = 1.0f;
+
+    [Header("Rest State")]
+    public bool isResting = false;
+    public Color restColor = Color.gray;
+
     [Header("Debug / Update")]
     public bool showCircleGuide = false;
+    public bool debugSolidCircle = false;
     public bool autoUpdate = true;
     public bool autoSetQuadAspect = false;
 
@@ -450,6 +459,10 @@ public class RDSController : MonoBehaviour
         mat.SetFloat("_ObjectSeed", objectSeed);
 
         mat.SetFloat("_ShowCircleGuide", showCircleGuide ? 1.0f : 0.0f);
+        mat.SetFloat("_DebugSolidCircle", debugSolidCircle ? 1.0f : 0.0f);
+
+        mat.SetFloat("_IsResting", isResting ? 1.0f : 0.0f);
+        mat.SetColor("_RestColor", restColor);
 
         mat.SetFloat("_CropEnabled", cropEnabled ? 1.0f : 0.0f);
         mat.SetFloat("_CropHalfWidthMm", cropHalfWidthMm);
@@ -457,6 +470,8 @@ public class RDSController : MonoBehaviour
 
         mat.SetFloat("_VirtualOffsetXPx", flatVirtualOffsetXPx);
         mat.SetFloat("_VirtualOffsetYPx", flatVirtualOffsetYPx);
+
+        mat.SetFloat("_FadeLevel", fadeLevel);
     }
 
     // =========================================================
