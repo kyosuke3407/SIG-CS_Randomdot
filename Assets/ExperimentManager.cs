@@ -13,7 +13,6 @@ public class ExperimentManager : MonoBehaviour
 
     [Header("Experiment Settings")]
     public float radius = 30f;
-    public float pixelDegree = 0.0133f;
     public float initialDisparityArcmin = 12.7f;
     public float initialStepArcmin = 6.38f;
     public float minStepArcmin = 0.798f;
@@ -50,25 +49,25 @@ public class ExperimentManager : MonoBehaviour
     public class StaircaseSeries
     {
         public bool isCross; // true = 手前 (Cross), false = 奥 (Uncrossed)
-        public int currentDisparityPx;
-        public int currentStepPx;
+        public float currentDisparityArcmin;
+        public float currentStepArcmin;
         public int consecutiveCorrect;
         public int reversalCount;
         public bool isFinished;
         public int lastDirection; // 1 = harder (decreased disp), -1 = easier (increased disp), 0 = start
 
-        public StaircaseSeries(bool isCross, int initialDispPx, int initialStepPx)
+        public StaircaseSeries(bool isCross, float initialDispArcmin, float initialStepArcmin)
         {
             this.isCross = isCross;
-            this.currentDisparityPx = initialDispPx;
-            this.currentStepPx = initialStepPx;
+            this.currentDisparityArcmin = initialDispArcmin;
+            this.currentStepArcmin = initialStepArcmin;
             this.consecutiveCorrect = 0;
             this.reversalCount = 0;
             this.isFinished = false;
             this.lastDirection = 0;
         }
 
-        public bool UpdateStep(bool isCorrect, int minStepPx)
+        public bool UpdateStep(bool isCorrect, float minStepArcmin)
         {
             bool isReversal = false;
             if (isCorrect)
@@ -82,9 +81,9 @@ public class ExperimentManager : MonoBehaviour
                     {
                         isReversal = true;
                         reversalCount++;
-                        currentStepPx = Mathf.Max(currentStepPx / 2, minStepPx);
+                        currentStepArcmin = Mathf.Max(currentStepArcmin / 2f, minStepArcmin);
                     }
-                    currentDisparityPx = Mathf.Max(1, currentDisparityPx - currentStepPx);
+                    currentDisparityArcmin = Mathf.Max(minStepArcmin, currentDisparityArcmin - currentStepArcmin);
                     lastDirection = newDirection;
                     consecutiveCorrect = 0;
                 }
@@ -98,9 +97,9 @@ public class ExperimentManager : MonoBehaviour
                 {
                     isReversal = true;
                     reversalCount++;
-                    currentStepPx = Mathf.Max(currentStepPx / 2, minStepPx);
+                    currentStepArcmin = Mathf.Max(currentStepArcmin / 2f, minStepArcmin);
                 }
-                currentDisparityPx += currentStepPx;
+                currentDisparityArcmin += currentStepArcmin;
                 lastDirection = newDirection;
             }
             return isReversal;
@@ -122,24 +121,12 @@ public class ExperimentManager : MonoBehaviour
     private bool isRestartPressed = false;
 
     private float pixelArcmin;
-    private int initialDisparityPx;
-    private int initialStepPx;
-    private int minStepPx;
 
     void Start()
     {
         if (logText != null) logText.text = "";
 
-        // 1ピクセルあたりの分度（Arcmin）
-        pixelArcmin = pixelDegree * 60f;
-
-        // Arcmin から ピクセル数への変換（一番近い整数へ）
-        initialDisparityPx = Mathf.RoundToInt(initialDisparityArcmin / pixelArcmin);
-        initialStepPx = Mathf.RoundToInt(initialStepArcmin / pixelArcmin);
-        minStepPx = Mathf.RoundToInt(minStepArcmin / pixelArcmin);
-
-        LogMessage($"Pixel = {pixelArcmin:F3} arcmin");
-        LogMessage($"Init Disp: {initialDisparityPx}px, Init Step: {initialStepPx}px, Min Step: {minStepPx}px");
+        LogMessage($"Init Disp: {initialDisparityArcmin} arcmin, Init Step: {initialStepArcmin} arcmin, Min Step: {minStepArcmin} arcmin");
 
         // Initialize CSV file
         string timestamp = DateTime.Now.ToString("yyyyMMdd_HHmmss");
@@ -152,7 +139,7 @@ public class ExperimentManager : MonoBehaviour
         }
 
         csvFilePath = Path.Combine(expFolderPath, $"ExperimentResult_{timestamp}.csv");
-        File.AppendAllText(csvFilePath, "TrialID,Condition,Series,DisparityArcmin,IsCorrect,IsReversal,CurrentStepArcmin\n");
+        File.AppendAllText(csvFilePath, "TrialID,Condition,Series,DisparityArcmin,IsTestSecond,IsCorrect,IsReversal,CurrentStepArcmin\n");
 
         if (startButton != null) startButton.onClick.AddListener(() => isStartPressed = true);
         if (restartButton != null) restartButton.onClick.AddListener(() => isRestartPressed = true);
@@ -322,8 +309,8 @@ public class ExperimentManager : MonoBehaviour
 
         LogMessage($"Block Started. Condition: {currentConditionName}");
 
-        crossSeries = new StaircaseSeries(true, initialDisparityPx, initialStepPx);
-        uncrossedSeries = new StaircaseSeries(false, initialDisparityPx, initialStepPx);
+        crossSeries = new StaircaseSeries(true, initialDisparityArcmin, initialStepArcmin);
+        uncrossedSeries = new StaircaseSeries(false, initialDisparityArcmin, initialStepArcmin);
 
         while (!crossSeries.isFinished || !uncrossedSeries.isFinished)
         {
@@ -349,9 +336,9 @@ public class ExperimentManager : MonoBehaviour
 
     IEnumerator RunTrial(StaircaseSeries series)
     {
-        // テスト刺激の視差を分度(arcmin)と度(deg)で計算
-        float currentDisparityArcmin = series.currentDisparityPx * pixelArcmin;
-        float currentDisparityDeg = series.currentDisparityPx * pixelDegree;
+        // テスト刺激の視差を分度(arcmin)と度(deg)で取得・計算
+        float currentDisparityArcmin = series.currentDisparityArcmin;
+        float currentDisparityDeg = currentDisparityArcmin / 60f;
 
         if (!series.isCross)
         {
@@ -359,19 +346,30 @@ public class ExperimentManager : MonoBehaviour
             currentDisparityDeg = -currentDisparityDeg; // 奥の場合は負の値と仮定
         }
 
+        // ランダムに提示順を決定 (true: Reference -> Test, false: Test -> Reference)
+        bool isTestSecond = (UnityEngine.Random.value > 0.5f);
+        float firstDisp = isTestSecond ? 0.0f : currentDisparityDeg;
+        float secondDisp = isTestSecond ? currentDisparityDeg : 0.0f;
+
         // デバッグ用に現在の正解方向を画面に表示
         string seriesName = series.isCross ? "Cross (手前)" : "Uncross (奥)";
+        string orderName = isTestSecond ? "Ref -> Test" : "Test -> Ref";
+        
+        // 2回目に提示された刺激が1回目に対して手前か奥かの正解
+        bool correctAnsIsCross = isTestSecond ? series.isCross : !series.isCross;
+        string correctAnsStr = correctAnsIsCross ? "Cross (手前)" : "Uncross (奥)";
+
         LogMessage($"--- Trial {trialCount} [{currentConditionName}] ---");
         LogMessage($"[Target] {seriesName} | Disp: {Mathf.Abs(currentDisparityArcmin):F2} arcmin");
+        LogMessage($"[Order] {orderName} | 2nd is: {correctAnsStr}");
 
         // 0. Pre-Trial State (真っ暗なまま待機)
         yield return new WaitForSeconds(preTrialDuration);
 
-        // 1. Reference State
-        // 前回の試行のResponse後、すでに真っ暗な状態から始まる
-        ShowRDS(currentLocation, radius, 0.0f);
+        // 1. First Interval
+        ShowRDS(currentLocation, radius, firstDisp);
         yield return StartCoroutine(FadeIn());
-        yield return new WaitForSeconds(referenceDuration);
+        yield return new WaitForSeconds(referenceDuration); // 1回目の提示時間
 
         // 2. ISI State
         yield return StartCoroutine(FadeOut());
@@ -379,10 +377,10 @@ public class ExperimentManager : MonoBehaviour
         // ★ここでのFadeInを削除し、真っ暗なまま待機する
         yield return new WaitForSeconds(isiDuration);
 
-        // 3. Test State
-        ShowRDS(currentLocation, radius, currentDisparityDeg);
+        // 3. Second Interval
+        ShowRDS(currentLocation, radius, secondDisp);
         yield return StartCoroutine(FadeIn());
-        yield return new WaitForSeconds(testDuration);
+        yield return new WaitForSeconds(testDuration); // 2回目の提示時間
 
         // 4. Response State
         yield return StartCoroutine(FadeOut());
@@ -396,12 +394,12 @@ public class ExperimentManager : MonoBehaviour
         }
 
         // 判定
-        bool isCorrect = (userResponseIsCross == series.isCross);
-        bool isReversal = series.UpdateStep(isCorrect, minStepPx);
+        bool isCorrect = (userResponseIsCross == correctAnsIsCross);
+        bool isReversal = series.UpdateStep(isCorrect, minStepArcmin);
 
         // ログ出力
-        float currentStepArcmin = series.currentStepPx * pixelArcmin;
-        string logLine = $"{trialCount},{currentConditionName},{(series.isCross ? "Cross" : "Uncross")},{currentDisparityArcmin},{isCorrect},{isReversal},{currentStepArcmin}\n";
+        float currentStepArcmin = series.currentStepArcmin;
+        string logLine = $"{trialCount},{currentConditionName},{(series.isCross ? "Cross" : "Uncross")},{currentDisparityArcmin},{isTestSecond},{isCorrect},{isReversal},{currentStepArcmin}\n";
         File.AppendAllText(csvFilePath, logLine);
 
         string userAnsStr = userResponseIsCross ? "Cross" : "Uncross";
@@ -549,12 +547,6 @@ public class ExperimentManager : MonoBehaviour
                 rdsController.UpdateRDSNow();
             }
 
-            // パラメータを最新のインスペクター値で再計算
-            pixelArcmin = pixelDegree * 60f;
-            initialDisparityPx = Mathf.RoundToInt(initialDisparityArcmin / pixelArcmin);
-            initialStepPx = Mathf.RoundToInt(initialStepArcmin / pixelArcmin);
-            minStepPx = Mathf.RoundToInt(minStepArcmin / pixelArcmin);
-
             StartCoroutine(ExperimentLoop());
         }
     }
@@ -566,6 +558,20 @@ public class ExperimentManager : MonoBehaviour
         {
             rdsController.debugSolidCircle = this.debugSolidCircle;
             rdsController.UpdateRDSNow();
+        }
+    }
+
+    // --- 追加：サブピクセルシェーダーの切り替え用メソッド ---
+    public void ToggleSubpixelShader()
+    {
+        if (rdsController != null)
+        {
+            rdsController.useSubpixelShader = !rdsController.useSubpixelShader;
+            
+            // マテリアルの再初期化を伴う更新を行う
+            rdsController.UpdateRDSNow();
+            
+            LogMessage($"Subpixel Shader: {(rdsController.useSubpixelShader ? "ON" : "OFF")}");
         }
     }
 }

@@ -129,6 +129,12 @@ public class RDSController : MonoBehaviour
     public bool autoUpdate = true;
     public bool autoSetQuadAspect = false;
 
+    [Header("Shader Settings")]
+    [Tooltip("サブピクセルシフト対応シェーダを使用するかどうか")]
+    public bool useSubpixelShader = true;
+    public Shader rdsShader;
+    public Shader subpixelRdsShader;
+
     // =========================================================
     // Result
     // =========================================================
@@ -325,6 +331,12 @@ public class RDSController : MonoBehaviour
         leftMat = activeLeftQuadRenderer.material;
         rightMat = activeRightQuadRenderer.material;
 
+        Shader targetShader = useSubpixelShader ? subpixelRdsShader : rdsShader;
+        if (targetShader != null)
+        {
+            leftMat.shader = targetShader;
+            rightMat.shader = targetShader;
+        }
     }
 
     // =========================================================
@@ -348,10 +360,20 @@ public class RDSController : MonoBehaviour
         UpdateDerivedParameters();
         UpdateCropParameters();
 
-        bestDisparityPx = SolveDisparityForTargetAngle();
-        halfDisparityPx = bestDisparityPx / 2.0f;
+        float bestDispFloat = SolveDisparityForTargetAngleFloat();
 
-        actualAngleDeg = DispPxToAngleDeg(bestDisparityPx);
+        if (!useSubpixelShader)
+        {
+            bestDisparityPx = Mathf.RoundToInt(bestDispFloat);
+            halfDisparityPx = bestDisparityPx / 2.0f;
+        }
+        else
+        {
+            halfDisparityPx = bestDispFloat / 2.0f;
+            bestDisparityPx = Mathf.RoundToInt(bestDispFloat); // インスペクター表示用
+        }
+
+        actualAngleDeg = DispPxToAngleDeg(halfDisparityPx * 2.0f);
         errorDeg = Mathf.Abs(actualAngleDeg - targetAngleDeg);
 
         leftShiftPx = halfDisparityPx;
@@ -561,45 +583,32 @@ public class RDSController : MonoBehaviour
     // Search
     // =========================================================
 
-    int SolveDisparityForTargetAngle()
+    float SolveDisparityForTargetAngleFloat()
     {
         if (Mathf.Approximately(targetAngleDeg, 0.0f))
         {
-            return 0;
+            return 0.0f;
         }
 
-        int start;
-        int end;
+        // DispPxToAngleDeg is monotonically increasing
+        float low = -1000.0f;
+        float high = 1000.0f;
 
-        if (targetAngleDeg > 0.0f)
+        for (int i = 0; i < 40; i++)
         {
-            start = positiveDispMinPx;
-            end = positiveDispMaxPx;
-        }
-        else
-        {
-            start = negativeDispMinPx;
-            end = negativeDispMaxPx;
-        }
-
-        int bestDisp = start;
-        float bestTheta = DispPxToAngleDeg(start);
-        float bestError = Mathf.Abs(bestTheta - targetAngleDeg);
-
-        for (int d = start; d <= end; d++)
-        {
-            float theta = DispPxToAngleDeg(d);
-            float err = Mathf.Abs(theta - targetAngleDeg);
-
-            if (err < bestError)
+            float mid = (low + high) * 0.5f;
+            float angle = DispPxToAngleDeg(mid);
+            if (angle < targetAngleDeg)
             {
-                bestDisp = d;
-                bestTheta = theta;
-                bestError = err;
+                low = mid;
+            }
+            else
+            {
+                high = mid;
             }
         }
 
-        return bestDisp;
+        return (low + high) * 0.5f;
     }
 
     // =========================================================
