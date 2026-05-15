@@ -199,7 +199,7 @@ Shader "Unlit/RDS_Subpixel"
                 // =================================================
                 // 背景ドット (サブピクセル補間)
                 // =================================================
-                float2 pBg = virtualPixel / dotSizePx - 0.5;
+                float2 pBg = virtualPixel / dotSizePx;
                 float2 p0Bg = floor(pBg);
                 float2 fBg = frac(pBg);
                 uint seedBg = SeedToUint(_BackgroundSeed);
@@ -238,7 +238,7 @@ Shader "Unlit/RDS_Subpixel"
                 // =================================================
                 float2 sourcePixel = virtualPixel - float2(shiftPx, 0.0);
                 
-                float2 pObj = sourcePixel / dotSizePx - 0.5;
+                float2 pObj = sourcePixel / dotSizePx;
                 float2 p0Obj = floor(pObj);
                 float2 fObj = frac(pObj);
                 uint seedObj = SeedToUint(_ObjectSeed);
