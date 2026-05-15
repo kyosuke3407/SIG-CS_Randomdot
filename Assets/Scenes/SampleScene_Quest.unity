@@ -854,28 +854,28 @@ MonoBehaviour:
   m_GameObject: {fileID: 183068511}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 2ada62c7249a9e14dbd48390a9d8cff1, type: 3}
+  m_Script: {fileID: 11500000, guid: 79239c143dce99a40a9f679ee01bcc21, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
   isExperimentMode: 0
   radius: 50
-  initialDisparityArcmin: 15
-  initialStepArcmin: 6.38
-  minStepArcmin: 0.798
-  maxReversals: 8
+  maxQuestTrials: 30
+  questPriorMean: 0.333
+  questPriorSD: 1
+  isPresentationOrderRandom: 1
   preTrialDuration: 0.5
   referenceDuration: 1
   isiDuration: 0.5
   testDuration: 1
   centerLocation: {x: 0, y: 0}
-  peripheralLocation: {x: 250, y: 0}
-  restColor: {r: 0.5849056, g: 0.5849056, b: 0.5849056, a: 1}
-  fadeDuration: 0.5
+  peripheralLocation: {x: 100, y: 0}
+  restColor: {r: 0.4528302, g: 0.24136703, b: 0.24136703, a: 1}
+  fadeDuration: 0.2
   startButton: {fileID: 2134722231}
   restartButton: {fileID: 560689318}
   quitButton: {fileID: 1394596728}
   logText: {fileID: 1286084274}
-  debugSolidCircle: 1
+  debugSolidCircle: 0
   rdsController: {fileID: 1263955916}
 --- !u!1 &269548158
 GameObject:
@@ -1262,7 +1262,7 @@ MonoBehaviour:
     m_PersistentCalls:
       m_Calls:
       - m_Target: {fileID: 183068513}
-        m_TargetAssemblyTypeName: ExperimentManager, Assembly-CSharp
+        m_TargetAssemblyTypeName: ExperimentManagerQuest, Assembly-CSharp
         m_MethodName: ToggleDebugSolidCircle
         m_Mode: 1
         m_Arguments:
@@ -3309,7 +3309,7 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_text: Start
+  m_text: Start EXP
   m_isRightToLeft: 0
   m_fontAsset: {fileID: 11400000, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
   m_sharedMaterial: {fileID: 2180264, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
@@ -4319,6 +4319,7 @@ MonoBehaviour:
   flatVirtualOffsetXWorld: 0
   flatVirtualOffsetYWorld: 0
   pWhite: 0.5
+  useGrayscaleDots: 0
   backgroundSeed: 0
   objectSeed: 100
   fadeLevel: 1
@@ -4332,6 +4333,7 @@ MonoBehaviour:
   rdsShader: {fileID: 4800000, guid: 5c377231fa1270f4b95254869e90c8e7, type: 3}
   subpixelRdsShader: {fileID: 4800000, guid: d3a369d1b4bc717409b5234b32a3f675, type: 3}
   bestDisparityPx: 47
+  exactTotalDisparityPx: 0
   halfDisparityPx: 0
   actualAngleDeg: 0
   errorDeg: 0
@@ -5191,7 +5193,7 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_text: Start
+  m_text: Debug
   m_isRightToLeft: 0
   m_fontAsset: {fileID: 11400000, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
   m_sharedMaterial: {fileID: 2180264, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
@@ -7574,7 +7576,7 @@ MonoBehaviour:
     m_PersistentCalls:
       m_Calls:
       - m_Target: {fileID: 183068513}
-        m_TargetAssemblyTypeName: ExperimentManager, Assembly-CSharp
+        m_TargetAssemblyTypeName: ExperimentManagerQuest, Assembly-CSharp
         m_MethodName: ToggleExperimentMode
         m_Mode: 1
         m_Arguments:
