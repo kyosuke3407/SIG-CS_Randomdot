@@ -862,14 +862,17 @@ MonoBehaviour:
   maxQuestTrials: 30
   questPriorMean: 0.333
   questPriorSD: 1
-  isPresentationOrderRandom: 1
+  isPresentationOrderRandom: 0
+  directionMode: 0
+  totalBlocks: 2
+  debugViewDuration: 2
   preTrialDuration: 0.5
   referenceDuration: 1
   isiDuration: 0.5
   testDuration: 1
   centerLocation: {x: 0, y: 0}
-  peripheralLocation: {x: 100, y: 0}
-  restColor: {r: 0.4528302, g: 0.24136703, b: 0.24136703, a: 1}
+  peripheralLocation: {x: 268, y: 0}
+  restColor: {r: 0.8445948, g: 0.5801887, b: 1, a: 1}
   fadeDuration: 0.2
   startButton: {fileID: 2134722231}
   restartButton: {fileID: 560689318}
@@ -4444,8 +4447,8 @@ MonoBehaviour:
   m_faceColor:
     serializedVersion: 2
     rgba: 4294967295
-  m_fontSize: 36
-  m_fontSizeBase: 36
+  m_fontSize: 30
+  m_fontSizeBase: 30
   m_fontWeight: 400
   m_enableAutoSizing: 0
   m_fontSizeMin: 18
@@ -6820,8 +6823,8 @@ MonoBehaviour:
   radiusMax: 200
   centerXSlider: {fileID: 269548160}
   centerXInput: {fileID: 136989303}
-  centerXMin: -200
-  centerXMax: 200
+  centerXMin: -500
+  centerXMax: 500
   centerYSlider: {fileID: 317624451}
   centerYInput: {fileID: 1468616183}
   centerYMin: -100

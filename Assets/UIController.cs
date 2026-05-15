@@ -26,7 +26,7 @@ public class UIController : MonoBehaviour
     public Slider radiusSlider;
     public TMP_InputField radiusInput;
     public float radiusMin = 1.0f;
-    public float radiusMax = 200.0f;
+    public float radiusMax = 500.0f;
 
     // =========================================================
     // Circle Center X
@@ -35,8 +35,8 @@ public class UIController : MonoBehaviour
     [Header("Circle Center X [world]")]
     public Slider centerXSlider;
     public TMP_InputField centerXInput;
-    public float centerXMin = -200.0f;
-    public float centerXMax = 200.0f;
+    public float centerXMin = -1000.0f;
+    public float centerXMax = 1000.0f;
 
     // =========================================================
     // Circle Center Y
@@ -45,8 +45,8 @@ public class UIController : MonoBehaviour
     [Header("Circle Center Y [world]")]
     public Slider centerYSlider;
     public TMP_InputField centerYInput;
-    public float centerYMin = -100.0f;
-    public float centerYMax = 100.0f;
+    public float centerYMin = -500.0f;
+    public float centerYMax = 500.0f;
 
     // =========================================================
     // Common
@@ -319,7 +319,7 @@ public class UIController : MonoBehaviour
     {
         if (controller == null)
         {
-            Debug.LogError("RDSController �����ݒ�ł��B");
+            Debug.LogError("RDSController が未設定です。");
             return;
         }
 
@@ -436,7 +436,7 @@ public class UIController : MonoBehaviour
             return value;
         }
 
-        // ���{����Ȃǂŏ����_�J���}���g��ꂽ�ꍇ�̕ی�
+        // 日本語環境などで小数点カンマが使われた場合の保険
         if (float.TryParse(
                 text,
                 NumberStyles.Float,

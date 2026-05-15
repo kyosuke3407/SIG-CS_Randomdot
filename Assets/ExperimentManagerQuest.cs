@@ -19,8 +19,15 @@ public class ExperimentManagerQuest : MonoBehaviour
     public float questPriorMean = 5.0f;
     [Tooltip("閾値の事前分布の標準偏差 (log scale)")]
     public float questPriorSD = 1.0f;
-    [Tooltip("提示順（標準→テスト）をランダムにするか、常に標準→テストの順にするか")]
     public bool isPresentationOrderRandom = true;
+    
+    public enum TargetDirectionMode { Both, CrossedOnly, UncrossedOnly }
+    [Header("Trial Control")]
+    public TargetDirectionMode directionMode = TargetDirectionMode.Both;
+    [Tooltip("全地点（中心・周辺）を何回繰り返すか")]
+    public int totalBlocks = 1;
+    [Tooltip("ブロック開始時に円の位置をガイド表示する時間 (秒)")]
+    public float debugViewDuration = 2.0f;
 
     [Header("Durations")]
     public float preTrialDuration = 0.5f;
@@ -147,6 +154,9 @@ public class ExperimentManagerQuest : MonoBehaviour
 
     private QuestSeries crossSeries;
     private QuestSeries uncrossedSeries;
+    
+    private List<Vector2> locationList = new List<Vector2>();
+    private List<string> locationNames = new List<string>();
 
     private int trialCount = 0;
     private Vector2 currentLocation;
@@ -229,50 +239,59 @@ public class ExperimentManagerQuest : MonoBehaviour
         // Wait for start
         while (!isStartPressed)
         {
-            var gamepad = UnityEngine.InputSystem.Gamepad.current;
-            if (gamepad != null && gamepad.buttonEast.wasPressedThisFrame)
-            {
-                isStartPressed = true;
-            }
+            if (CheckStartInput()) isStartPressed = true;
             yield return null;
         }
         if (startButton != null) startButton.gameObject.SetActive(false);
 
-        while (true)
+        // 条件リストの作成
+        locationList.Clear();
+        locationNames.Clear();
+        locationList.Add(centerLocation); locationNames.Add("Center");
+        locationList.Add(peripheralLocation); locationNames.Add("Peripheral");
+
+        for (int l = 0; l < totalBlocks; l++)
         {
-            yield return StartCoroutine(RunExperimentBlock());
-
-            // 休憩モードへ移行
-            if (rdsController != null)
+            LogMessage($"--- Starting Global Block {l + 1} / {totalBlocks} ---");
+            // 地点の順番をシャッフル
+            List<int> indices = new List<int> { 0, 1 };
+            for (int i = 0; i < indices.Count; i++)
             {
-                rdsController.isResting = true;
-                rdsController.restColor = this.restColor;
-                rdsController.UpdateRDSNow();
+                int temp = indices[i];
+                int randomIndex = UnityEngine.Random.Range(i, indices.Count);
+                indices[i] = indices[randomIndex];
+                indices[randomIndex] = temp;
             }
 
-            if (restartButton != null) restartButton.gameObject.SetActive(true);
-            isRestartPressed = false;
-
-            while (!isRestartPressed)
+            foreach (int idx in indices)
             {
-                var gamepad = UnityEngine.InputSystem.Gamepad.current;
-                if (gamepad != null && gamepad.buttonEast.wasPressedThisFrame)
-                {
-                    isRestartPressed = true;
-                }
-                yield return null;
-            }
-
-            if (restartButton != null) restartButton.gameObject.SetActive(false);
-
-            // 休憩モード解除、真っ暗な状態に戻す
-            if (rdsController != null)
-            {
-                rdsController.isResting = false;
-                rdsController.fadeLevel = 0f;
-                rdsController.UpdateRDSNow();
+                currentLocation = locationList[idx];
+                currentConditionName = locationNames[idx];
+                yield return StartCoroutine(RunExperimentBlock());
             }
         }
+
+        LogMessage("All Experiments Finished!");
+        
+        // 休憩モード（終了状態）へ
+        if (rdsController != null)
+        {
+            rdsController.isResting = true;
+            rdsController.restColor = Color.black;
+            rdsController.UpdateRDSNow();
+        }
+        
+        if (restartButton != null) restartButton.gameObject.SetActive(true);
+    }
+
+    bool CheckStartInput()
+    {
+        var keyboard = UnityEngine.InputSystem.Keyboard.current;
+        if (keyboard != null && (keyboard.enterKey.wasPressedThisFrame || keyboard.spaceKey.wasPressedThisFrame)) return true;
+
+        var gamepad = UnityEngine.InputSystem.Gamepad.current;
+        if (gamepad != null && gamepad.buttonEast.wasPressedThisFrame) return true;
+        return false;
     }
 
     void Update()
@@ -291,7 +310,7 @@ public class ExperimentManagerQuest : MonoBehaviour
         {
             bool responded = false;
 
-            // キーボード入力
+            // 新Input System (キーボード)
             var keyboard = UnityEngine.InputSystem.Keyboard.current;
             if (keyboard != null)
             {
@@ -307,7 +326,7 @@ public class ExperimentManagerQuest : MonoBehaviour
                 }
             }
 
-            // ゲームパッド入力
+            // 新Input System (ゲームパッド)
             var gamepad = UnityEngine.InputSystem.Gamepad.current;
             if (gamepad != null && !responded)
             {
@@ -334,29 +353,39 @@ public class ExperimentManagerQuest : MonoBehaviour
 
     IEnumerator RunExperimentBlock()
     {
-        // ランダムに条件（中心か周辺か）を決定
-        if (UnityEngine.Random.value > 0.5f)
-        {
-            currentLocation = centerLocation;
-            currentConditionName = "Center";
-        }
-        else
-        {
-            currentLocation = peripheralLocation;
-            currentConditionName = "Peripheral";
-        }
-
         LogMessage($"Block Started. Condition: {currentConditionName}");
 
-        crossSeries = new QuestSeries(true, maxQuestTrials, questPriorMean, questPriorSD);
-        uncrossedSeries = new QuestSeries(false, maxQuestTrials, questPriorMean, questPriorSD);
+        // --- ブロック開始前の位置ガイド表示 ---
+        if (debugViewDuration > 0)
+        {
+            LogMessage("Showing location guide...");
+            bool originalDebug = this.debugSolidCircle;
+            this.debugSolidCircle = true; // 強制的に白円表示
+            
+            // パラメータ設定
+            ShowRDS(currentLocation, radius, 0f);
+            rdsController.fadeLevel = 0f;
+            rdsController.UpdateRDSNow();
 
-        while (!crossSeries.isFinished || !uncrossedSeries.isFinished)
+            // ガイドもフェードインさせる
+            yield return StartCoroutine(FadeIn());
+            yield return new WaitForSeconds(debugViewDuration);
+            yield return StartCoroutine(FadeOut());
+            
+            this.debugSolidCircle = originalDebug; // 元に戻す
+            HideRDS();
+            yield return new WaitForSeconds(0.5f); // 開始前の余白
+        }
+
+        crossSeries = (directionMode == TargetDirectionMode.UncrossedOnly) ? null : new QuestSeries(true, maxQuestTrials, questPriorMean, questPriorSD);
+        uncrossedSeries = (directionMode == TargetDirectionMode.CrossedOnly) ? null : new QuestSeries(false, maxQuestTrials, questPriorMean, questPriorSD);
+
+        while ((crossSeries != null && !crossSeries.isFinished) || (uncrossedSeries != null && !uncrossedSeries.isFinished))
         {
             // どちらの系列を提示するかランダムに選ぶ
             List<QuestSeries> activeSeries = new List<QuestSeries>();
-            if (!crossSeries.isFinished) activeSeries.Add(crossSeries);
-            if (!uncrossedSeries.isFinished) activeSeries.Add(uncrossedSeries);
+            if (crossSeries != null && !crossSeries.isFinished) activeSeries.Add(crossSeries);
+            if (uncrossedSeries != null && !uncrossedSeries.isFinished) activeSeries.Add(uncrossedSeries);
 
             QuestSeries currentSeries = activeSeries[UnityEngine.Random.Range(0, activeSeries.Count)];
 
@@ -414,6 +443,8 @@ public class ExperimentManagerQuest : MonoBehaviour
 
         // 1. First Interval
         ShowRDS(currentLocation, radius, firstDisp);
+        rdsController.fadeLevel = 0f;
+        rdsController.UpdateRDSNow(); // まず透明な状態でパラメータを反映
         yield return StartCoroutine(FadeIn());
         yield return new WaitForSeconds(referenceDuration); // 1回目の提示時間
 
@@ -425,6 +456,8 @@ public class ExperimentManagerQuest : MonoBehaviour
 
         // 3. Second Interval
         ShowRDS(currentLocation, radius, secondDisp);
+        rdsController.fadeLevel = 0f;
+        rdsController.UpdateRDSNow(); // まず透明な状態でパラメータを反映
         yield return StartCoroutine(FadeIn());
         yield return new WaitForSeconds(testDuration); // 2回目の提示時間
 
@@ -500,9 +533,6 @@ public class ExperimentManagerQuest : MonoBehaviour
             // ランダムドットのパターンを毎回変えるためにシード値を更新
             rdsController.backgroundSeed = UnityEngine.Random.Range(1f, 10000f);
             rdsController.objectSeed = UnityEngine.Random.Range(1f, 10000f);
-
-            // 視差0のときは表示するがターゲット視差を0にする
-            rdsController.UpdateRDSNow();
         }
         else
         {
