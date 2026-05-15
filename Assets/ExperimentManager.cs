@@ -574,4 +574,15 @@ public class ExperimentManager : MonoBehaviour
             LogMessage($"Subpixel Shader: {(rdsController.useSubpixelShader ? "ON" : "OFF")}");
         }
     }
+
+    // --- 追加：グレースケールランダムドットの切り替え用メソッド ---
+    public void ToggleGrayscaleDots()
+    {
+        if (rdsController != null)
+        {
+            rdsController.useGrayscaleDots = !rdsController.useGrayscaleDots;
+            rdsController.UpdateRDSNow();
+            LogMessage($"Grayscale Dots: {(rdsController.useGrayscaleDots ? "ON" : "OFF")}");
+        }
+    }
 }

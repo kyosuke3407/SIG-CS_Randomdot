@@ -108,6 +108,9 @@ public class RDSController : MonoBehaviour
     [Range(0.0f, 1.0f)]
     public float pWhite = 0.5f;
 
+    [Tooltip("ランダムドットを2値ではなくグレースケールにするかどうか")]
+    public bool useGrayscaleDots = false;
+
     public float backgroundSeed = 1.0f;
     public float objectSeed = 1.0f;
 
@@ -140,7 +143,10 @@ public class RDSController : MonoBehaviour
     // =========================================================
 
     [Header("Result")]
+    [Tooltip("最も近い整数ピクセル数")]
     [SerializeField] private int bestDisparityPx;
+    [Tooltip("計算された正確な総ピクセルシフト量（浮動小数点）")]
+    [SerializeField] private float exactTotalDisparityPx;
     [SerializeField] private float halfDisparityPx;
     [SerializeField] private float actualAngleDeg;
     [SerializeField] private float errorDeg;
@@ -361,6 +367,7 @@ public class RDSController : MonoBehaviour
         UpdateCropParameters();
 
         float bestDispFloat = SolveDisparityForTargetAngleFloat();
+        exactTotalDisparityPx = bestDispFloat;
 
         if (!useSubpixelShader)
         {
@@ -479,6 +486,7 @@ public class RDSController : MonoBehaviour
         mat.SetFloat("_PWhite", pWhite);
         mat.SetFloat("_BackgroundSeed", backgroundSeed);
         mat.SetFloat("_ObjectSeed", objectSeed);
+        mat.SetFloat("_GrayscaleDots", useGrayscaleDots ? 1.0f : 0.0f);
 
         mat.SetFloat("_ShowCircleGuide", showCircleGuide ? 1.0f : 0.0f);
         mat.SetFloat("_DebugSolidCircle", debugSolidCircle ? 1.0f : 0.0f);

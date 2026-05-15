@@ -60,6 +60,7 @@ Shader "Unlit/RDS_Subpixel"
             float _PWhite;
             float _BackgroundSeed;
             float _ObjectSeed;
+            float _GrayscaleDots;
 
             float _ShowCircleGuide;
 
@@ -120,10 +121,17 @@ Shader "Unlit/RDS_Subpixel"
                 return (float)(h & 0x00FFFFFFu) / 16777215.0;
             }
 
-            float RandomDot(uint2 cell, uint seed, float pWhite)
+            float RandomDot(uint2 cell, uint seed, float pWhite, float useGrayscale)
             {
                 float r = Random01(cell, seed);
-                return (r < pWhite) ? 1.0 : 0.0;
+                if (useGrayscale > 0.5)
+                {
+                    return r; // グレースケールノイズ
+                }
+                else
+                {
+                    return (r < pWhite) ? 1.0 : 0.0; // 2値ノイズ
+                }
             }
 
             uint SeedToUint(float seed)
@@ -196,10 +204,10 @@ Shader "Unlit/RDS_Subpixel"
                 float2 fBg = frac(pBg);
                 uint seedBg = SeedToUint(_BackgroundSeed);
                 
-                float bg00 = RandomDot((uint2)p0Bg, seedBg, _PWhite);
-                float bg10 = RandomDot((uint2)(p0Bg + float2(1, 0)), seedBg, _PWhite);
-                float bg01 = RandomDot((uint2)(p0Bg + float2(0, 1)), seedBg, _PWhite);
-                float bg11 = RandomDot((uint2)(p0Bg + float2(1, 1)), seedBg, _PWhite);
+                float bg00 = RandomDot((uint2)p0Bg, seedBg, _PWhite, _GrayscaleDots);
+                float bg10 = RandomDot((uint2)(p0Bg + float2(1, 0)), seedBg, _PWhite, _GrayscaleDots);
+                float bg01 = RandomDot((uint2)(p0Bg + float2(0, 1)), seedBg, _PWhite, _GrayscaleDots);
+                float bg11 = RandomDot((uint2)(p0Bg + float2(1, 1)), seedBg, _PWhite, _GrayscaleDots);
                 
                 float bg0 = lerp(bg00, bg10, fBg.x);
                 float bg1 = lerp(bg01, bg11, fBg.x);
@@ -235,10 +243,10 @@ Shader "Unlit/RDS_Subpixel"
                 float2 fObj = frac(pObj);
                 uint seedObj = SeedToUint(_ObjectSeed);
 
-                float obj00 = RandomDot((uint2)p0Obj, seedObj, _PWhite);
-                float obj10 = RandomDot((uint2)(p0Obj + float2(1, 0)), seedObj, _PWhite);
-                float obj01 = RandomDot((uint2)(p0Obj + float2(0, 1)), seedObj, _PWhite);
-                float obj11 = RandomDot((uint2)(p0Obj + float2(1, 1)), seedObj, _PWhite);
+                float obj00 = RandomDot((uint2)p0Obj, seedObj, _PWhite, _GrayscaleDots);
+                float obj10 = RandomDot((uint2)(p0Obj + float2(1, 0)), seedObj, _PWhite, _GrayscaleDots);
+                float obj01 = RandomDot((uint2)(p0Obj + float2(0, 1)), seedObj, _PWhite, _GrayscaleDots);
+                float obj11 = RandomDot((uint2)(p0Obj + float2(1, 1)), seedObj, _PWhite, _GrayscaleDots);
 
                 float o0 = lerp(obj00, obj10, fObj.x);
                 float o1 = lerp(obj01, obj11, fObj.x);
