@@ -20,7 +20,7 @@ public class ExperimentManagerQuest : MonoBehaviour
     [Tooltip("閾値の事前分布の標準偏差 (log scale)")]
     public float questPriorSD = 1.0f;
     public bool isPresentationOrderRandom = true;
-    
+
     public enum TargetDirectionMode { Both, CrossedOnly, UncrossedOnly }
     [Header("Trial Control")]
     public TargetDirectionMode directionMode = TargetDirectionMode.Both;
@@ -66,11 +66,11 @@ public class ExperimentManagerQuest : MonoBehaviour
 
         private int gridPoints = 200;
         private float minLogT = -1.0f; // log10(0.1)
-        private float maxLogT = 2.0f;  // log10(100)
-        
+        private float maxLogT = 1.778f;  // log10(100)
+
         private float[] tGrid;
         private double[] pdf;
-        
+
         // Weibull parameters
         private double gamma = 0.5;
         private double epsilon = 0.01;
@@ -116,7 +116,7 @@ public class ExperimentManagerQuest : MonoBehaviour
                 double t = tGrid[i];
                 // Weibull psychometric function for 2AFC
                 double pCorrect = gamma + (1.0 - gamma - epsilon) * (1.0 - Math.Exp(-Math.Pow(10.0, beta * (x - t))));
-                
+
                 double likelihood = isCorrect ? pCorrect : (1.0 - pCorrect);
                 pdf[i] = pdf[i] * likelihood;
                 sum += pdf[i];
@@ -146,7 +146,7 @@ public class ExperimentManagerQuest : MonoBehaviour
                     maxIndex = i;
                 }
             }
-            
+
             float bestLogT = tGrid[maxIndex];
             currentDisparityArcmin = Mathf.Pow(10.0f, bestLogT);
         }
@@ -154,7 +154,7 @@ public class ExperimentManagerQuest : MonoBehaviour
 
     private QuestSeries crossSeries;
     private QuestSeries uncrossedSeries;
-    
+
     private List<Vector2> locationList = new List<Vector2>();
     private List<string> locationNames = new List<string>();
 
@@ -250,6 +250,9 @@ public class ExperimentManagerQuest : MonoBehaviour
         locationList.Add(centerLocation); locationNames.Add("Center");
         locationList.Add(peripheralLocation); locationNames.Add("Peripheral");
 
+        int totalConditions = totalBlocks * locationList.Count;
+        int conditionsFinished = 0;
+
         for (int l = 0; l < totalBlocks; l++)
         {
             LogMessage($"--- Starting Global Block {l + 1} / {totalBlocks} ---");
@@ -268,11 +271,17 @@ public class ExperimentManagerQuest : MonoBehaviour
                 currentLocation = locationList[idx];
                 currentConditionName = locationNames[idx];
                 yield return StartCoroutine(RunExperimentBlock());
+
+                conditionsFinished++;
+                if (conditionsFinished < totalConditions)
+                {
+                    yield return StartCoroutine(ShowRestBreak());
+                }
             }
         }
 
         LogMessage("All Experiments Finished!");
-        
+
         // 休憩モード（終了状態）へ
         if (rdsController != null)
         {
@@ -280,8 +289,54 @@ public class ExperimentManagerQuest : MonoBehaviour
             rdsController.restColor = Color.black;
             rdsController.UpdateRDSNow();
         }
-        
+
         if (restartButton != null) restartButton.gameObject.SetActive(true);
+    }
+
+    IEnumerator ShowRestBreak()
+    {
+        LogMessage("Break Time. Press Enter, Space or Gamepad O (East) to resume next condition.");
+
+        // 休憩モード（レスト画面）へ移行
+        if (rdsController != null)
+        {
+            rdsController.isResting = true;
+            rdsController.restColor = this.restColor;
+            rdsController.UpdateRDSNow();
+        }
+
+        if (restartButton != null) restartButton.gameObject.SetActive(true);
+        isRestartPressed = false;
+
+        while (!isRestartPressed)
+        {
+            // 新Input System (キーボード：Enter または Space)
+            var keyboard = UnityEngine.InputSystem.Keyboard.current;
+            if (keyboard != null && (keyboard.enterKey.wasPressedThisFrame || keyboard.spaceKey.wasPressedThisFrame))
+            {
+                isRestartPressed = true;
+            }
+
+            // 新Input System (ゲームパッド：Eastボタン)
+            var gamepad = UnityEngine.InputSystem.Gamepad.current;
+            if (gamepad != null && gamepad.buttonEast.wasPressedThisFrame)
+            {
+                isRestartPressed = true;
+            }
+            yield return null;
+        }
+
+        if (restartButton != null) restartButton.gameObject.SetActive(false);
+
+        // 休憩モード解除、真っ暗な状態（刺激表示前）に戻す
+        if (rdsController != null)
+        {
+            rdsController.isResting = false;
+            rdsController.fadeLevel = 0f;
+            rdsController.UpdateRDSNow();
+        }
+
+        LogMessage("Resuming experiment...");
     }
 
     bool CheckStartInput()
@@ -361,7 +416,7 @@ public class ExperimentManagerQuest : MonoBehaviour
             LogMessage("Showing location guide...");
             bool originalDebug = this.debugSolidCircle;
             this.debugSolidCircle = true; // 強制的に白円表示
-            
+
             // パラメータ設定
             ShowRDS(currentLocation, radius, 0f);
             rdsController.fadeLevel = 0f;
@@ -371,7 +426,7 @@ public class ExperimentManagerQuest : MonoBehaviour
             yield return StartCoroutine(FadeIn());
             yield return new WaitForSeconds(debugViewDuration);
             yield return StartCoroutine(FadeOut());
-            
+
             this.debugSolidCircle = originalDebug; // 元に戻す
             HideRDS();
             yield return new WaitForSeconds(0.5f); // 開始前の余白
@@ -429,7 +484,7 @@ public class ExperimentManagerQuest : MonoBehaviour
         // デバッグ用に現在の正解方向を画面に表示
         string seriesName = series.isCross ? "Cross (手前)" : "Uncross (奥)";
         string orderName = isTestSecond ? "Ref -> Test" : "Test -> Ref";
-        
+
         // 2回目に提示された刺激が1回目に対して手前か奥かの正解
         bool correctAnsIsCross = isTestSecond ? series.isCross : !series.isCross;
         string correctAnsStr = correctAnsIsCross ? "Cross (手前)" : "Uncross (奥)";
@@ -639,10 +694,10 @@ public class ExperimentManagerQuest : MonoBehaviour
         if (rdsController != null)
         {
             rdsController.useSubpixelShader = !rdsController.useSubpixelShader;
-            
+
             // マテリアルの再初期化を伴う更新を行う
             rdsController.UpdateRDSNow();
-            
+
             LogMessage($"Subpixel Shader: {(rdsController.useSubpixelShader ? "ON" : "OFF")}");
         }
     }
