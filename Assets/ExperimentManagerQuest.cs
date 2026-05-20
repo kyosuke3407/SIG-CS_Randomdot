@@ -65,7 +65,7 @@ public class ExperimentManagerQuest : MonoBehaviour
         public bool isFinished;
 
         private int gridPoints = 200;
-        private float minLogT = -1.0f; // log10(0.1)
+        private float minLogT = -1.30f; // log10(0.1)
         private float maxLogT = 1.778f;  // log10(100)
 
         private float[] tGrid;

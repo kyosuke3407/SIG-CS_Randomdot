@@ -863,7 +863,7 @@ MonoBehaviour:
   radius: 50
   maxQuestTrials: 25
   questPriorMean: 1
-  questPriorSD: 1.5
+  questPriorSD: 3
   isPresentationOrderRandom: 0
   directionMode: 0
   totalBlocks: 2
